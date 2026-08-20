@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>条形码扫描器</title>
+    <script src="./html5-qrcode.min.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+		
+		p {
+		text-align:center;
+		}
+		
+		/* 取景器 */
+        #reader {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            height: 300px;
+            overflow: hidden;
+            border: 1px solid #ccc;
+			border-radius: 5px;
+			margin: auto;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #capturedCanvas {
+            display: none;
+        }
+
+        #input-container {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        input {
+            font-size: 16px;
+            padding: 10px;
+            margin-top: 10px;
+            width: 312px;
+			border-radius: 5px;
+			border: 1px solid gray;
+        }
+
+        button {
+            font-size: 16px;
+            padding: 10px;
+            margin-top: 10px;
+            width: 336px;
+			background: #24b324;
+			border: none;
+			border-radius: 5px;
+			color: white;
+			letter-spacing: 5px;
+			font-weight: bold;
+        }
+		
+		
+        #passwordContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+            margin-top: 20px;
+        }
+
+        #mainContent {
+            display: none;
+            width: 100%;
+        }
+
+        #recent-fee-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .recent-fee {
+            cursor: pointer;
+            padding: 10px;
+            background: #e0e0e0;
+            border-radius: 5px;
+            transition: background 0.3s;
+			width: 60px;
+			height:22px;
+			text-align: center;
+        }
+
+        .recent-fee:hover {
+            background: #d0d0d0;
+        }
+
+        .noscan {
+            margin-top: 10px;
+        }
+
+        .noscan a {
+            text-decoration: underline;
+            color: blue;
+        }
+		
+		.top{
+		display: none;
+		}
+    </style>
+</head>
+<body>
+    <div class="top">
+        <p>运费上传系统</p>
+    </div>
+    <div id="passwordContainer">
+        <input type="password" id="passwordInput" placeholder="请输入密码" />
+        <button id="loginButton">登录</button>
+    </div>
+
+    <div id="mainContent">
+        <div id="reader">
+            <video></video>
+            <canvas id="capturedCanvas"></canvas>
+        </div>
+        <div id="input-container">
+            <input type="text" id="barcodeInput" placeholder="运单，支持扫描或输入" />
+            <input type="number" id="feeInput" placeholder="输入运费" />
+            <button id="sendButton">上传</button>
+            <button id="nextScanButton">重新扫描</button>
+			<!--
+            <div class="noscan">
+                <a href="quagga.html">扫不到？</a>
+            </div>
+			-->
+            <div id="recent-fee-container">
+                <div class="recent-fee" id="fee1">运费1</div>
+                <div class="recent-fee" id="fee2">运费2</div>
+                <div class="recent-fee" id="fee3">运费3</div>
+            </div>
+        </div>
+    </div>
+	<div class="note">
+		<p>此程序将上传扫描结果到利佳盛服务器，<br>请谨慎操作！</p>
+        <p style="margin-top: 20px;"><a href="report.html" style="color: #666; text-decoration: none; border-bottom: 1px dashed #999;">进入后台统计与数据导入</a></p>
+	</div>
+
+    <script>
+        // 检测系统是否已安装
+        fetch('check_install.php', {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'not_installed') {
+                window.location.href = data.redirect;
+            }
+        })
+        .catch(err => {
+            console.warn("安装检测失败，可能系统未正确部署", err);
+        });
+
+        const barcodeInput = document.getElementById('barcodeInput');
+        const feeInput = document.getElementById('feeInput');
+        const sendButton = document.getElementById('sendButton');
+        const nextScanButton = document.getElementById('nextScanButton');
+        const passwordInput = document.getElementById('passwordInput');
+        const loginButton = document.getElementById('loginButton');
+        const mainContent = document.getElementById('mainContent');
+        const passwordContainer = document.getElementById('passwordContainer');
+        const recentFees = [document.getElementById('fee1'), document.getElementById('fee2'), document.getElementById('fee3')];
+
+        let recentFeeValues = [];
+        let html5QrcodeScanner;
+        let scanCompleted = false; // 确保上传前只扫描一次
+
+        function startScanner() {
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            html5QrcodeScanner.start(
+                { facingMode: "environment" },
+                {
+                    fps: 10, // 扫描速度
+                    qrbox: { width: 250, height: 250 } // 扫描器尺寸
+                },
+                async (decodedText, decodedResult) => {
+                    if (scanCompleted) return; // 确保只扫描一次
+
+                    console.log(`扫描到的条形码内容: "${decodedText}"`);
+
+                    const upperText = decodedText.toUpperCase();
+                    const isNum = /^\d+$/.test(decodedText);
+                    const len = decodedText.length;
+                    
+                    let isValid = false;
+
+                    // 1. 全数字: 支持 15位 或 12位
+                    if (isNum && (len === 15 || len === 12)) {
+                        isValid = true;
+                    } 
+                    // 2. 12位, XF开头
+                    else if (len === 12 && upperText.startsWith('XF')) {
+                        isValid = true;
+                    }
+                    // 3. 15位, SF开头
+                    else if (len === 15 && upperText.startsWith('SF')) {
+                        isValid = true;
+                    }
+
+                    if (!isValid) {
+						// 播放错误声音
+						const errorSound = new Audio('./err.mp3');
+						errorSound.play();
+						showTemporaryAlert("条码格式无效！\n请检查是否为:\n- 12/15位纯数字\n- XF开头(12位)\n- SF开头(15位)", "#f5b93f", 2000);
+                        return;
+                    }
+
+                    barcodeInput.value = decodedText;
+                    scanCompleted = true; // 标记扫描完成
+
+                    // 播放成功声音
+                    const okSound = new Audio('./ok.mp3');
+                    okSound.play();
+
+                    captureImage();
+                },
+                (errorMessage) => {
+                    console.warn(`扫描错误: ${errorMessage}`);
+                }
+            ).catch((err) => {
+                console.error("摄像头启动失败:", err);
+            });
+        }
+
+        async function captureImage() {
+            const videoElement = document.querySelector("#reader video");
+            const canvas = document.getElementById('capturedCanvas');
+            const context = canvas.getContext('2d');
+
+            if (videoElement) {
+				video.srcObject.getTracks().forEach(track => track.stop()); //
+                canvas.width = videoElement.videoWidth;
+                canvas.height = videoElement.videoHeight;
+				context.filter = 'grayscale(100%) brightness(1.1) contrast(1.2)';
+                context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+
+                html5QrcodeScanner.stop().then(() => {
+                    console.log("摄像头已关闭");
+                }).catch((err) => {
+                    console.error("摄像头关闭错误:", err);
+                });
+            } else {
+                console.error("无法找到视频元素");
+            }
+        }
+
+        async function verifyPassword() {
+            const password = passwordInput.value;
+            
+            try {
+                const response = await fetch('login_api.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: password })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    localStorage.setItem('isLoggedIn', 'true');
+                    passwordContainer.style.display = 'none';
+                    mainContent.style.display = 'block';
+                    startScanner();
+                } else {
+                    showTemporaryAlert(data.message || "密码错误，请重试！", "#f5b93f");
+                }
+            } catch (err) {
+                console.error("Login error", err);
+                showTemporaryAlert("登录请求失败，请检查网络", "#f5b93f");
+            }
+        }
+
+        function checkLoginStatus() {
+            // 可选：在这里也可以调用 login_api.php 检查 session
+            // 但为了保持快速响应，暂时保留 localStorage 检查
+            const isLoggedIn = localStorage.getItem('isLoggedIn');
+            if (isLoggedIn === 'true') {
+                passwordContainer.style.display = 'none';
+                mainContent.style.display = 'block';
+                startScanner();
+            } else {
+                passwordContainer.style.display = 'flex';
+            }
+        }
+
+        function updateRecentFees() {
+            recentFees.forEach((element, index) => {
+                element.textContent = recentFeeValues[index] || '';
+                element.style.display = recentFeeValues[index] ? 'block' : 'flex';
+            });
+        }
+		
+		function showTemporaryAlert(message, backgroundColor = "#4CAF50", duration = 500) {
+            const alertBox = document.createElement('div');
+            alertBox.style.position = 'fixed';
+            alertBox.style.top = '50%';
+            alertBox.style.left = '50%';
+            alertBox.style.transform = 'translate(-50%, -50%)';
+            alertBox.style.padding = '20px';
+            alertBox.style.color = 'white';
+            alertBox.style.borderRadius = '5px';
+            alertBox.style.boxShadow = '0px 0px 10px rgba(0, 0, 0, 0.1)';
+            alertBox.textContent = message;
+			alertBox.style.backgroundColor = backgroundColor;
+            document.body.appendChild(alertBox);
+
+            setTimeout(() => {
+                document.body.removeChild(alertBox);
+            }, duration);
+        }
+		
+        function addFeeToRecent(value) {
+            recentFeeValues.unshift(value);
+            if (recentFeeValues.length > 3) {
+                recentFeeValues.pop();
+            }
+            updateRecentFees();
+        }
+
+        sendButton.addEventListener('click', () => {
+            const feeValue = feeInput.value;
+            const trackValue = barcodeInput.value;
+            if (!feeValue || !trackValue) {
+                showTemporaryAlert("请填写有效的条形码和费用！", "#f5b93f");
+                return;
+            }
+
+            const currentDomain = window.location.origin;
+            const url = `${currentDomain}/fee.php?track=${encodeURIComponent(trackValue)}&fee=${encodeURIComponent(feeValue)}`;
+            fetch(url)
+                .then(response => {
+                    if (response.ok) {
+                        showTemporaryAlert("上传成功！");
+                        addFeeToRecent(feeValue);
+                        feeInput.value = '';
+                        barcodeInput.value = '';
+						scanCompleted = false; // 允许重新扫描
+						startScanner();
+                    } else {
+                        showTemporaryAlert("上传失败，请重试！", "#f5b93f");
+                    }
+                })
+                .catch(error => {
+                    console.error("上传错误:", error);
+                });
+        });
+		
+		recentFees.forEach((element, index) => {
+            element.addEventListener('click', () => {
+                if (recentFeeValues[index]) {
+                    feeInput.value = recentFeeValues[index];
+                }
+            });
+        });
+		
+        nextScanButton.addEventListener('click', () => {
+            barcodeInput.value = '';
+            feeInput.value = '';
+            scanCompleted = false; // 允许重新扫描
+            startScanner();
+        });
+
+        loginButton.addEventListener('click', verifyPassword);
+        checkLoginStatus();
+    </script>
+</body>
+</html>
