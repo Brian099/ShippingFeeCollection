@@ -105,6 +105,30 @@
         tr.clickable-row:hover {
             background-color: #f8f9fa;
         }
+        
+        /* 快捷日期按钮容器 */
+        .quick-date-container {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+        .quick-date-btn {
+            font-size: 0.85rem;
+            padding: 0.25rem 0.65rem;
+            border-radius: 4px;
+        }
+        @media (max-width: 576px) {
+            .quick-date-container {
+                margin-bottom: 8px;
+                gap: 4px;
+            }
+            .quick-date-btn {
+                font-size: 0.8rem;
+                padding: 0.2rem 0.45rem;
+            }
+        }
     </style>
 </head>
 <body class="hold-transition layout-top-nav">
@@ -196,6 +220,16 @@
                             </div>
                         </div>
                         <div class="card-body">
+                            <!-- 快捷日期筛选 -->
+                            <div class="quick-date-container">
+                                <span class="text-muted mr-1" style="font-size: 0.875rem;"><i class="far fa-calendar-alt mr-1"></i>快捷筛选：</span>
+                                <button type="button" class="btn btn-outline-primary quick-date-btn" onclick="setDateRange('today', this)">今天</button>
+                                <button type="button" class="btn btn-outline-primary quick-date-btn" onclick="setDateRange('yesterday', this)">昨天</button>
+                                <button type="button" class="btn btn-outline-primary quick-date-btn" onclick="setDateRange('beforeYesterday', this)">前天</button>
+                                <button type="button" class="btn btn-outline-secondary quick-date-btn" onclick="setDateRange('last3', this)">近3天</button>
+                                <button type="button" class="btn btn-outline-secondary quick-date-btn" onclick="setDateRange('last7', this)">近7天</button>
+                                <button type="button" class="btn btn-outline-secondary quick-date-btn" onclick="setDateRange('all', this)">全部</button>
+                            </div>
                             <div class="row">
                                 <div class="col-md-3 col-6">
                                     <div class="form-group">
@@ -407,13 +441,72 @@
         
         let authToken = '';
 
+        // 格式化日期为 YYYY-MM-DD
+        function formatDate(d) {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
         // 初始化日期选择器
         function initDates() {
             const now = new Date();
             // 默认结束日期为今天
-            document.getElementById('endDate').valueAsDate = now;
+            document.getElementById('endDate').value = formatDate(now);
             // 开始日期留空
             document.getElementById('startDate').value = '';
+        }
+
+        // 清除快捷按钮高亮
+        function clearActiveQuickButtons() {
+            document.querySelectorAll('.quick-date-btn').forEach(btn => btn.classList.remove('active'));
+        }
+
+        // 快捷设置日期范围
+        function setDateRange(type, btnElement) {
+            const startDateInput = document.getElementById('startDate');
+            const endDateInput = document.getElementById('endDate');
+            clearActiveQuickButtons();
+
+            const today = new Date();
+
+            if (type === 'today') {
+                const d = formatDate(today);
+                startDateInput.value = d;
+                endDateInput.value = d;
+            } else if (type === 'yesterday') {
+                const d = new Date();
+                d.setDate(d.getDate() - 1);
+                const str = formatDate(d);
+                startDateInput.value = str;
+                endDateInput.value = str;
+            } else if (type === 'beforeYesterday') {
+                const d = new Date();
+                d.setDate(d.getDate() - 2);
+                const str = formatDate(d);
+                startDateInput.value = str;
+                endDateInput.value = str;
+            } else if (type === 'last3') {
+                const start = new Date();
+                start.setDate(start.getDate() - 2);
+                startDateInput.value = formatDate(start);
+                endDateInput.value = formatDate(today);
+            } else if (type === 'last7') {
+                const start = new Date();
+                start.setDate(start.getDate() - 6);
+                startDateInput.value = formatDate(start);
+                endDateInput.value = formatDate(today);
+            } else if (type === 'all') {
+                startDateInput.value = '';
+                endDateInput.value = '';
+            }
+
+            if (btnElement) {
+                btnElement.classList.add('active');
+            }
+
+            fetchData();
         }
 
         // 登录逻辑
@@ -565,8 +658,14 @@
             if (e.key === 'Enter') verifyPassword();
         });
 
-        document.getElementById('startDate').addEventListener('change', fetchData);
-        document.getElementById('endDate').addEventListener('change', fetchData);
+        document.getElementById('startDate').addEventListener('change', () => {
+            clearActiveQuickButtons();
+            fetchData();
+        });
+        document.getElementById('endDate').addEventListener('change', () => {
+            clearActiveQuickButtons();
+            fetchData();
+        });
 
         let debounceTimer;
         document.getElementById('trackNo').addEventListener('input', () => {
