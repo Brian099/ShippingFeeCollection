@@ -35,6 +35,35 @@
             align-items: center;
         }
         
+        /* 顶部导航栏自适应 */
+        .main-header .container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .main-header .navbar-nav {
+            flex-direction: row !important;
+            align-items: center;
+        }
+        .main-header .navbar-nav .nav-link {
+            display: inline-flex;
+            align-items: center;
+        }
+        .small-box h3 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin: 0 0 5px 0;
+            white-space: nowrap;
+            display: flex;
+            align-items: baseline;
+        }
+        .currency-symbol {
+            font-size: 0.7em;
+            margin-right: 2px;
+            font-weight: 600;
+            line-height: 1;
+        }
+        
         /* 移动端优化 */
         @media (max-width: 576px) {
             .hidden-mobile {
@@ -45,6 +74,28 @@
                 font-size: 0.9rem;
             }
             
+            /* 导航栏紧凑布局 */
+            .main-header {
+                padding: 0.35rem 0.5rem;
+            }
+            .main-header .container {
+                padding-left: 5px;
+                padding-right: 5px;
+            }
+            .main-header .navbar-brand {
+                font-size: 0.95rem;
+                margin-right: 0;
+                padding: 0.2rem 0;
+                font-weight: 600;
+            }
+            .main-header .navbar-nav .nav-link {
+                padding: 0.25rem 0.35rem !important;
+                font-size: 0.8rem;
+            }
+            .main-header .navbar-nav .nav-item + .nav-item {
+                margin-left: 2px;
+            }
+
             /* 隐藏非核心区域 */
             .content-header, .main-footer {
                 display: none !important;
@@ -58,23 +109,29 @@
             /* 统计卡片极简模式 */
             .small-box {
                 margin-bottom: 10px;
-                box-shadow: none;
-                border: 1px solid rgba(0,0,0,0.1);
+                box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                border-radius: 6px;
                 text-align: center;
             }
             .small-box .inner {
-                padding: 5px;
+                padding: 8px 4px;
             }
             .small-box h3 {
-                font-size: 1.2rem;
+                font-size: 1.25rem;
                 margin: 0;
+                line-height: 1.2;
+                justify-content: center;
             }
             .small-box p {
                 font-size: 0.8rem;
-                margin: 0;
+                margin: 2px 0 0 0;
             }
             .small-box .icon {
                 display: none;
+            }
+            .currency-symbol {
+                font-size: 0.75em;
+                margin-right: 1px;
             }
             
             /* 筛选栏紧凑化 */
@@ -166,7 +223,7 @@
     <!-- 主界面 -->
     <div id="mainContent" class="wrapper">
         <!-- Navbar -->
-        <nav class="main-header navbar navbar-expand-md navbar-light navbar-white">
+        <nav class="main-header navbar navbar-expand navbar-light navbar-white">
             <div class="container">
                 <a href="#" class="navbar-brand">
                     <span class="brand-text font-weight-light">运费统计系统</span>
@@ -277,7 +334,7 @@
                             <!-- small box -->
                             <div class="small-box bg-success">
                                 <div class="inner">
-                                    <h3><sup style="font-size: 20px">¥</sup><span id="totalFee">0.00</span></h3>
+                                    <h3><span class="currency-symbol">¥</span><span id="totalFee">0.00</span></h3>
                                     <p>总运费</p>
                                 </div>
                                 <div class="icon">
