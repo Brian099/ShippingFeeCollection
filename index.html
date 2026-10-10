@@ -182,17 +182,40 @@
         const recentFees = [document.getElementById('fee1'), document.getElementById('fee2'), document.getElementById('fee3')];
 
         let recentFeeValues = [];
-        let html5QrcodeScanner;
+        let html5QrcodeScanner = null;
+        let scannerRunning = false;                 // 摄像头当前是否在运行
+        let scannerStopPromise = Promise.resolve(); // 记录关闭动作，避免关闭未完成就重新启动
         let scanCompleted = false; // 确保上传前只扫描一次
 
-        function startScanner() {
-            html5QrcodeScanner = new Html5Qrcode("reader");
-            html5QrcodeScanner.start(
-                { facingMode: "environment" },
-                {
-                    fps: 10, // 扫描速度
-                    qrbox: { width: 250, height: 250 } // 扫描器尺寸
-                },
+        // 音频对象只创建一次并复用，避免每次扫描都新建导致内存持续增长
+        const okSound = new Audio('./ok.mp3');
+        const errorSound = new Audio('./err.mp3');
+
+        function playSound(audio) {
+            try {
+                audio.currentTime = 0;
+                audio.play().catch(() => {});
+            } catch (e) {
+                // 忽略播放失败（如浏览器自动播放策略限制）
+            }
+        }
+
+        async function startScanner() {
+            await scannerStopPromise; // 等待上一次关闭完成，避免重复占用摄像头
+            if (scannerRunning) return; // 已在扫描，避免重复创建实例
+
+            if (!html5QrcodeScanner) {
+                html5QrcodeScanner = new Html5Qrcode("reader");
+            }
+
+            scannerRunning = true;
+            try {
+                await html5QrcodeScanner.start(
+                    { facingMode: "environment" },
+                    {
+                        fps: 10, // 扫描速度
+                        qrbox: { width: 250, height: 250 } // 扫描器尺寸
+                    },
                 async (decodedText, decodedResult) => {
                     if (scanCompleted) return; // 确保只扫描一次
 
@@ -219,8 +242,7 @@
 
                     if (!isValid) {
 						// 播放错误声音
-						const errorSound = new Audio('./err.mp3');
-						errorSound.play();
+						playSound(errorSound);
 						showTemporaryAlert("条码格式无效！\n请检查是否为:\n- 12/15位纯数字\n- XF开头(12位)\n- SF开头(15位)", "#f5b93f", 2000);
                         return;
                     }
@@ -229,39 +251,31 @@
                     scanCompleted = true; // 标记扫描完成
 
                     // 播放成功声音
-                    const okSound = new Audio('./ok.mp3');
-                    okSound.play();
+                    playSound(okSound);
 
-                    captureImage();
+                    stopScanner(); // 立即关闭摄像头，释放资源
                 },
                 (errorMessage) => {
                     console.warn(`扫描错误: ${errorMessage}`);
                 }
-            ).catch((err) => {
+                );
+            } catch (err) {
+                scannerRunning = false;
                 console.error("摄像头启动失败:", err);
-            });
+            }
         }
 
-        async function captureImage() {
-            const videoElement = document.querySelector("#reader video");
-            const canvas = document.getElementById('capturedCanvas');
-            const context = canvas.getContext('2d');
-
-            if (videoElement) {
-				video.srcObject.getTracks().forEach(track => track.stop()); //
-                canvas.width = videoElement.videoWidth;
-                canvas.height = videoElement.videoHeight;
-				context.filter = 'grayscale(100%) brightness(1.1) contrast(1.2)';
-                context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-
-                html5QrcodeScanner.stop().then(() => {
+        function stopScanner() {
+            if (!html5QrcodeScanner || !scannerRunning) return scannerStopPromise;
+            scannerRunning = false;
+            scannerStopPromise = html5QrcodeScanner.stop()
+                .then(() => {
                     console.log("摄像头已关闭");
-                }).catch((err) => {
+                })
+                .catch((err) => {
                     console.error("摄像头关闭错误:", err);
                 });
-            } else {
-                console.error("无法找到视频元素");
-            }
+            return scannerStopPromise;
         }
 
         async function verifyPassword() {
