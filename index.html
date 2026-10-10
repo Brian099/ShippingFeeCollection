@@ -36,8 +36,15 @@
             object-fit: cover;
         }
 
-        #capturedCanvas {
-            display: none;
+        /* 扫到单后冻结的画面，覆盖在取景框上 */
+        #reader .snapshot {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 10;
         }
 
         #input-container {
@@ -130,7 +137,6 @@
     <div id="mainContent">
         <div id="reader">
             <video></video>
-            <canvas id="capturedCanvas"></canvas>
         </div>
         <div id="input-container">
             <input type="text" id="barcodeInput" placeholder="运单，支持扫描或输入" />
@@ -253,6 +259,7 @@
                     // 播放成功声音
                     playSound(okSound);
 
+                    freezeFrame(); // 冻结当前画面，关闭摄像头后仍可看到扫到的单
                     stopScanner(); // 立即关闭摄像头，释放资源
                 },
                 (errorMessage) => {
@@ -263,6 +270,23 @@
                 scannerRunning = false;
                 console.error("摄像头启动失败:", err);
             }
+        }
+
+        // 把当前摄像头画面冻结成一张图片覆盖在取景框上，
+        // 这样关闭摄像头后取景框里仍能看到刚扫到的单，而不是一片白
+        function freezeFrame() {
+            const videoElement = document.querySelector("#reader video");
+            if (!videoElement || !videoElement.videoWidth) return;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+            canvas.getContext('2d').drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+
+            const img = document.createElement('img');
+            img.src = canvas.toDataURL('image/jpeg', 0.8);
+            img.className = 'snapshot';
+            document.getElementById('reader').appendChild(img);
         }
 
         function stopScanner() {
@@ -343,6 +367,8 @@
         }
 		
         function addFeeToRecent(value) {
+            // 去重：保留最近三个“不同”的运费值
+            recentFeeValues = recentFeeValues.filter(v => v !== value);
             recentFeeValues.unshift(value);
             if (recentFeeValues.length > 3) {
                 recentFeeValues.pop();
