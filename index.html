@@ -207,8 +207,12 @@
         }
 
         async function startScanner() {
-            await scannerStopPromise; // 等待上一次关闭完成，避免重复占用摄像头
-            if (scannerRunning) return; // 已在扫描，避免重复创建实例
+            await scannerStopPromise; // 等待可能正在进行的关闭动作完成
+            if (scannerRunning) {
+                // 摄像头常开：只需清掉上一张冻结画面，立即恢复实时取景，无需重新打开摄像头
+                clearSnapshot();
+                return;
+            }
 
             if (!html5QrcodeScanner) {
                 html5QrcodeScanner = new Html5Qrcode("reader");
@@ -259,11 +263,11 @@
                     // 播放成功声音
                     playSound(okSound);
 
-                    freezeFrame(); // 冻结当前画面，关闭摄像头后仍可看到扫到的单
-                    stopScanner(); // 立即关闭摄像头，释放资源
+                    freezeFrame(); // 冻结当前画面盖在取景框上，作为"已扫到"的提示（摄像头保持开启）
                 },
                 (errorMessage) => {
-                    console.warn(`扫描错误: ${errorMessage}`);
+                    // 每帧解码失败都会回调（约 10 次/秒），这里不做输出，
+                    // 否则日志会在控制台缓冲区里持续堆积，扫描越多越拖慢页面
                 }
                 );
             } catch (err) {
@@ -272,21 +276,30 @@
             }
         }
 
-        // 把当前摄像头画面冻结成一张图片覆盖在取景框上，
-        // 这样关闭摄像头后取景框里仍能看到刚扫到的单，而不是一片白
+        // 扫到单后把当前画面冻结成一张图片盖在取景框上，作为"已扫到"的视觉提示
         function freezeFrame() {
             const videoElement = document.querySelector("#reader video");
             if (!videoElement || !videoElement.videoWidth) return;
 
+            // 取景框最大只有 400x300，按显示尺寸等比缩小即可，
+            // 避免每次保存整幅高分辨率画面（大 canvas + 大 base64 + 解码位图）造成内存/GC 压力
+            const maxWidth = 480;
+            const scale = Math.min(1, maxWidth / videoElement.videoWidth);
             const canvas = document.createElement('canvas');
-            canvas.width = videoElement.videoWidth;
-            canvas.height = videoElement.videoHeight;
+            canvas.width = Math.round(videoElement.videoWidth * scale);
+            canvas.height = Math.round(videoElement.videoHeight * scale);
             canvas.getContext('2d').drawImage(videoElement, 0, 0, canvas.width, canvas.height);
 
             const img = document.createElement('img');
-            img.src = canvas.toDataURL('image/jpeg', 0.8);
+            img.src = canvas.toDataURL('image/jpeg', 0.6);
             img.className = 'snapshot';
             document.getElementById('reader').appendChild(img);
+        }
+
+        // 清掉冻结画面，露出下面实时取景的摄像头画面
+        function clearSnapshot() {
+            const old = document.querySelector('#reader .snapshot');
+            if (old) old.remove();
         }
 
         function stopScanner() {
@@ -417,6 +430,15 @@
             feeInput.value = '';
             scanCompleted = false; // 允许重新扫描
             startScanner();
+        });
+
+        // 切到后台时释放摄像头省电；回到前台且已登录时重新打开，保证回来即可继续扫描
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopScanner();
+            } else if (localStorage.getItem('isLoggedIn') === 'true') {
+                startScanner();
+            }
         });
 
         loginButton.addEventListener('click', verifyPassword);
