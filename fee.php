@@ -32,6 +32,28 @@ if ($track && $fee) {
         $carrier = '顺丰';
     }
 
+    // 检查运单是否已存在：已存在则提示并跳过，避免重复写入
+    $checkSql = "SELECT id FROM freight_logs WHERE track_no = ? LIMIT 1";
+    if ($checkStmt = $mysqli->prepare($checkSql)) {
+        $checkStmt->bind_param("s", $track);
+        $checkStmt->execute();
+        $checkStmt->store_result();
+        $exists = $checkStmt->num_rows > 0;
+        $checkStmt->close();
+
+        if ($exists) {
+            http_response_code(409); // Conflict: 运单已存在
+            echo "DUPLICATE_TRACK";
+            $mysqli->close();
+            exit;
+        }
+    } else {
+        http_response_code(500);
+        echo "Database prepare error: " . $mysqli->error;
+        $mysqli->close();
+        exit;
+    }
+
     // 准备 SQL 语句 (使用预处理语句防止 SQL 注入)
     $sql = "INSERT INTO freight_logs (track_no, carrier, fee, created_at) VALUES (?, ?, ?, NOW())";
     

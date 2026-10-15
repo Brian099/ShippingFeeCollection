@@ -408,6 +408,13 @@
                         barcodeInput.value = '';
 						scanCompleted = false; // 允许重新扫描
 						startScanner();
+                    } else if (response.status === 409) {
+                        // 运单已存在：提示并跳过（不重复写入，也不计入最近运费）
+                        showTemporaryAlert("该运单已存在，已跳过", "#f5b93f", 1500);
+                        feeInput.value = '';
+                        barcodeInput.value = '';
+						scanCompleted = false; // 允许重新扫描
+						startScanner();
                     } else {
                         showTemporaryAlert("上传失败，请重试！", "#f5b93f");
                     }
