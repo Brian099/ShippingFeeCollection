@@ -6,12 +6,20 @@
     <title>条形码扫描器</title>
     <script src="./html5-qrcode.min.js"></script>
     <style>
+        html, body {
+            height: 100%;
+        }
+
         body {
             display: flex;
             flex-direction: column;
             align-items: center;
             margin: 0;
-            padding: 20px;
+            padding: 10px 20px;
+            box-sizing: border-box;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
         }
 		
 		p {
@@ -23,11 +31,11 @@
             position: relative;
             width: 100%;
             max-width: 400px;
-            height: 300px;
+            height: 270px;
+            flex-shrink: 0;
             overflow: hidden;
             border: 1px solid #ccc;
 			border-radius: 5px;
-			margin: auto;
         }
 
         video {
@@ -48,16 +56,23 @@
         }
 
         #input-container {
-            margin-top: 20px;
+            margin-top: 8px;
             display: flex;
             flex-direction: column;
             align-items: center;
+            flex: 1;
+            min-height: 0;
+            width: 100%;
+        }
+
+        #input-container > input {
+            flex-shrink: 0;
         }
 
         input {
             font-size: 16px;
-            padding: 10px;
-            margin-top: 10px;
+            padding: 8px;
+            margin-top: 8px;
             width: 312px;
 			border-radius: 5px;
 			border: 1px solid gray;
@@ -81,34 +96,16 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            margin-bottom: 20px;
-            margin-top: 20px;
+            margin: auto;
         }
 
         #mainContent {
             display: none;
             width: 100%;
-        }
-
-        #recent-fee-container {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .recent-fee {
-            cursor: pointer;
-            padding: 10px;
-            background: #e0e0e0;
-            border-radius: 5px;
-            transition: background 0.3s;
-			width: 60px;
-			height:22px;
-			text-align: center;
-        }
-
-        .recent-fee:hover {
-            background: #d0d0d0;
+            flex: 1;
+            min-height: 0;
+            flex-direction: column;
+            align-items: center;
         }
 
         .noscan {
@@ -122,6 +119,97 @@
 		
 		.top{
 		display: none;
+		}
+		
+		.note {
+			margin-top: 10px;
+			flex-shrink: 0;
+		}
+		
+		.note p {
+			margin: 4px 0;
+			font-size: 13px;
+		}
+		
+		/* 运费数字键盘：用屏幕按键输入，避免呼出系统键盘导致页面跳动 */
+		#feeInput {
+			text-align: center;
+			font-size: 18px;
+		}
+		
+		#fee-row {
+			display: flex;
+			gap: 8px;
+			width: 336px;
+			margin-top: 8px;
+			flex-shrink: 0;
+		}
+		
+		#fee-row #feeInput {
+			flex: 1;
+			margin-top: 0;
+			width: auto;
+		}
+		
+		#clear-fee-key {
+			margin-top: 0;
+			width: auto;
+			padding: 0 14px;
+			font-size: 15px;
+			background: #e0e0e0;
+			color: #333;
+			letter-spacing: 1px;
+			white-space: nowrap;
+		}
+		
+		#fee-keypad {
+			display: grid;
+			grid-template-columns: repeat(4, 1fr);
+			grid-template-rows: repeat(3, 1fr);
+			gap: 6px;
+			width: 336px;
+			margin-top: 6px;
+			flex: 1;
+			min-height: 0;
+		}
+		
+		#fee-keypad .key {
+			margin: 0;
+			width: auto;
+			padding: 0;
+			font-size: 18px;
+			font-weight: normal;
+			letter-spacing: 0;
+			background: #f0f0f0;
+			color: #333;
+			border-radius: 5px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+		
+		#fee-keypad .key:active {
+			background: #d0d0d0;
+		}
+		
+		#fee-keypad .key.action {
+			background: #ffa000;
+			color: #fff;
+		}
+		
+		#action-row {
+			display: flex;
+			gap: 8px;
+			width: 336px;
+			margin-top: 10px;
+			flex-shrink: 0;
+		}
+		
+		#action-row button {
+			flex: 1;
+			margin-top: 0;
+			width: auto;
+			letter-spacing: 2px;
 		}
     </style>
 </head>
@@ -140,24 +228,38 @@
         </div>
         <div id="input-container">
             <input type="text" id="barcodeInput" placeholder="运单，支持扫描或输入" />
-            <input type="number" id="feeInput" placeholder="输入运费" />
-            <button id="sendButton">上传</button>
-            <button id="nextScanButton">重新扫描</button>
+            <div id="fee-row">
+                <input type="text" id="feeInput" placeholder="输入运费" readonly inputmode="none" />
+                <button type="button" id="clear-fee-key">清空</button>
+            </div>
+            <div id="fee-keypad">
+                <button type="button" class="key" data-key="1">1</button>
+                <button type="button" class="key" data-key="2">2</button>
+                <button type="button" class="key" data-key="3">3</button>
+                <button type="button" class="key" data-key=".">.</button>
+                <button type="button" class="key" data-key="4">4</button>
+                <button type="button" class="key" data-key="5">5</button>
+                <button type="button" class="key" data-key="6">6</button>
+                <button type="button" class="key action" data-action="backspace">⌫</button>
+                <button type="button" class="key" data-key="7">7</button>
+                <button type="button" class="key" data-key="8">8</button>
+                <button type="button" class="key" data-key="9">9</button>
+                <button type="button" class="key" data-key="0">0</button>
+            </div>
+            <div id="action-row">
+                <button id="sendButton">上传</button>
+                <button id="nextScanButton">重新扫描</button>
+            </div>
 			<!--
             <div class="noscan">
                 <a href="quagga.html">扫不到？</a>
             </div>
 			-->
-            <div id="recent-fee-container">
-                <div class="recent-fee" id="fee1">运费1</div>
-                <div class="recent-fee" id="fee2">运费2</div>
-                <div class="recent-fee" id="fee3">运费3</div>
-            </div>
         </div>
     </div>
 	<div class="note">
 		<p>此程序将上传扫描结果到利佳盛服务器，<br>请谨慎操作！</p>
-        <p style="margin-top: 20px;"><a href="report.html" style="color: #666; text-decoration: none; border-bottom: 1px dashed #999;">进入后台统计与数据导入</a></p>
+        <p><a href="report.html" style="color: #666; text-decoration: none; border-bottom: 1px dashed #999;">进入后台统计与数据导入</a></p>
 	</div>
 
     <script>
@@ -185,9 +287,7 @@
         const loginButton = document.getElementById('loginButton');
         const mainContent = document.getElementById('mainContent');
         const passwordContainer = document.getElementById('passwordContainer');
-        const recentFees = [document.getElementById('fee1'), document.getElementById('fee2'), document.getElementById('fee3')];
 
-        let recentFeeValues = [];
         let html5QrcodeScanner = null;
         let scannerRunning = false;                 // 摄像头当前是否在运行
         let scannerStopPromise = Promise.resolve(); // 记录关闭动作，避免关闭未完成就重新启动
@@ -329,7 +429,7 @@
                 if (data.success) {
                     localStorage.setItem('isLoggedIn', 'true');
                     passwordContainer.style.display = 'none';
-                    mainContent.style.display = 'block';
+                    mainContent.style.display = 'flex';
                     startScanner();
                 } else {
                     showTemporaryAlert(data.message || "密码错误，请重试！", "#f5b93f");
@@ -346,21 +446,14 @@
             const isLoggedIn = localStorage.getItem('isLoggedIn');
             if (isLoggedIn === 'true') {
                 passwordContainer.style.display = 'none';
-                mainContent.style.display = 'block';
+                mainContent.style.display = 'flex';
                 startScanner();
             } else {
                 passwordContainer.style.display = 'flex';
             }
         }
 
-        function updateRecentFees() {
-            recentFees.forEach((element, index) => {
-                element.textContent = recentFeeValues[index] || '';
-                element.style.display = recentFeeValues[index] ? 'block' : 'flex';
-            });
-        }
-		
-		function showTemporaryAlert(message, backgroundColor = "#4CAF50", duration = 500) {
+        function showTemporaryAlert(message, backgroundColor = "#4CAF50", duration = 500) {
             const alertBox = document.createElement('div');
             alertBox.style.position = 'fixed';
             alertBox.style.top = '50%';
@@ -379,21 +472,44 @@
             }, duration);
         }
 		
-        function addFeeToRecent(value) {
-            // 去重：保留最近三个“不同”的运费值
-            recentFeeValues = recentFeeValues.filter(v => v !== value);
-            recentFeeValues.unshift(value);
-            if (recentFeeValues.length > 3) {
-                recentFeeValues.pop();
-            }
-            updateRecentFees();
-        }
+        // 运费数字键盘：点击屏幕按键输入，避免呼出系统键盘导致页面跳动
+        document.querySelectorAll('#fee-keypad .key').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const action = btn.dataset.action;
+                const key = btn.dataset.key;
+
+                if (action === 'backspace') {
+                    feeInput.value = feeInput.value.slice(0, -1);
+                    return;
+                }
+
+                if (key === '.') {
+                    if (feeInput.value.includes('.')) return; // 只允许一个小数点
+                    feeInput.value = feeInput.value === '' ? '0.' : feeInput.value + '.';
+                    return;
+                }
+
+                // 数字：避免出现 0123 这样的前导零
+                feeInput.value = feeInput.value === '0' ? key : feeInput.value + key;
+            });
+        });
+
+        document.getElementById('clear-fee-key').addEventListener('click', () => {
+            feeInput.value = '';
+        });
+
+        // 防止点击运费输入框时呼出键盘（运费仅通过屏幕按键输入）
+        feeInput.addEventListener('focus', () => feeInput.blur());
 
         sendButton.addEventListener('click', () => {
             const feeValue = feeInput.value;
             const trackValue = barcodeInput.value;
             if (!feeValue || !trackValue) {
                 showTemporaryAlert("请填写有效的条形码和费用！", "#f5b93f");
+                return;
+            }
+            if (!/^\d+(\.\d+)?$/.test(feeValue)) {
+                showTemporaryAlert("运费格式不正确，请重新输入！", "#f5b93f");
                 return;
             }
 
@@ -403,13 +519,12 @@
                 .then(response => {
                     if (response.ok) {
                         showTemporaryAlert("上传成功！");
-                        addFeeToRecent(feeValue);
                         feeInput.value = '';
                         barcodeInput.value = '';
 						scanCompleted = false; // 允许重新扫描
 						startScanner();
                     } else if (response.status === 409) {
-                        // 运单已存在：提示并跳过（不重复写入，也不计入最近运费）
+                        // 运单已存在：提示并跳过（不重复写入）
                         showTemporaryAlert("该运单已存在，已跳过", "#f5b93f", 1500);
                         feeInput.value = '';
                         barcodeInput.value = '';
@@ -423,15 +538,7 @@
                     console.error("上传错误:", error);
                 });
         });
-		
-		recentFees.forEach((element, index) => {
-            element.addEventListener('click', () => {
-                if (recentFeeValues[index]) {
-                    feeInput.value = recentFeeValues[index];
-                }
-            });
-        });
-		
+
         nextScanButton.addEventListener('click', () => {
             barcodeInput.value = '';
             feeInput.value = '';
